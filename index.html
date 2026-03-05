@@ -16,7 +16,7 @@
 
         body {
             font-family: 'Inter', sans-serif;
-            background: #ffffff; /* <-- FONDO BLANCO AQUÍ */
+            background: #ffffff; /* Fondo blanco */
             margin: 0; padding: 20px;
             color: var(--text);
             display: flex; flex-direction: column; align-items: center;
@@ -61,8 +61,7 @@
 
         /* TABLA DEL HORARIO */
         .schedule-container {
-            width: 100%; 
-            max-width: 800px; /* <-- REDUCIDO DE 1000px A 800px PARA ACHICAR LA TABLA */
+            width: 100%; max-width: 800px; /* Tamaño reducido */
             background: #fff;
             border-radius: 16px;
             box-shadow: 0 4px 20px rgba(0,0,0,0.05);
@@ -75,31 +74,31 @@
         th { 
             background: var(--dark); color: var(--primary); 
             font-family: 'Oswald', sans-serif; text-transform: uppercase; letter-spacing: 1px;
-            padding: 8px 5px; /* <-- REDUCIDO PARA ACHICAR BLOQUE */
-            font-weight: 400; font-size: 0.9rem; /* <-- REDUCIDO */
+            padding: 8px 5px; font-weight: 400; font-size: 0.9rem;
         }
         
-        td { border: 1px solid var(--border); padding: 5px; vertical-align: middle; width: 16.6%; } /* <-- PADDING REDUCIDO */
+        td { border: 1px solid var(--border); padding: 5px; vertical-align: middle; width: 16.6%; }
         td.time-col { 
-            background: var(--gray); font-family: 'Oswald', sans-serif; font-size: 0.8rem; /* <-- REDUCIDO */
+            background: var(--gray); font-family: 'Oswald', sans-serif; font-size: 0.8rem; 
             color: var(--dark); width: 10%; 
         }
 
         /* TARJETA DE ASIGNATURA DENTRO DE LA TABLA */
         .class-card {
-            background: rgba(255, 214, 10, 0.15); /* Fondo amarillo tenue */
+            background: rgba(255, 214, 10, 0.15); 
             border-left: 4px solid var(--primary);
-            padding: 5px; /* <-- REDUCIDO */
+            padding: 5px;
             border-radius: 6px;
-            font-size: 0.75rem; /* <-- REDUCIDO */
+            font-size: 0.75rem;
             display: inline-block;
             width: 90%;
             text-align: left;
-            line-height: 1.2; /* <-- REDUCIDO */
+            line-height: 1.2;
+            margin-bottom: 3px;
         }
 
-        .class-code { font-weight: 700; color: var(--dark); display: block; margin-bottom: 2px; font-size: 0.8rem;} /* <-- REDUCIDO */
-        .class-room { font-size: 0.7rem; color: #555; display: flex; align-items: center; gap: 4px;} /* <-- REDUCIDO */
+        .class-code { font-weight: 700; color: var(--dark); display: block; margin-bottom: 2px; font-size: 0.75rem;}
+        .class-room { font-size: 0.7rem; color: #555; display: flex; align-items: center; gap: 4px;}
 
     </style>
 </head>
@@ -137,24 +136,14 @@
     const scheduleUI = document.getElementById('scheduleUI');
     const tbody = document.querySelector('#scheduleTable tbody');
 
-    // Módulos estándar según el PDF
     const modulos = [
         "08:15 - 09:35", "09:50 - 11:10", "11:25 - 12:45", 
         "13:45 - 15:05", "15:20 - 16:40", "16:55 - 18:15"
     ];
 
-    // Diccionario temporal para simular los nombres de los ramos (esto se puede ampliar extrayendo la tabla 1 del PDF)
-    const nombresRamos = {
-        "27014-0": "Mecánica Newtoniana",
-        "27016-0": "Termodinámica",
-        "27017-0": "Cálculo Vectorial",
-        "27024-0": "Física Computacional IV",
-        "27025-0": "Estadística Moderna",
-        "27026-0": "Proyecto Especialidad",
-        "27027-0": "Inglés IV"
-    };
+    // EL DICCIONARIO AHORA EMPIEZA VACÍO. SE LLENARÁ SOLO AL LEER EL PDF.
+    let nombresRamos = {};
 
-    // Crear grilla vacía
     function initGrid() {
         tbody.innerHTML = '';
         modulos.forEach((mod, index) => {
@@ -171,93 +160,137 @@
 
     fileInput.addEventListener('change', function(e) {
         const file = e.target.files[0];
-        if (file.type !== 'application/pdf') {
+        if (!file || file.type !== 'application/pdf') {
             alert('Por favor sube un archivo PDF válido.');
             return;
         }
 
-        initGrid(); // Limpiar tabla
+        initGrid(); 
         const reader = new FileReader();
 
         reader.onload = function(evt) {
             const typedarray = new Uint8Array(evt.target.result);
             
-            // Cargar PDF
             pdfjsLib.getDocument(typedarray).promise.then(pdf => {
                 return pdf.getPage(1);
             }).then(page => {
                 return page.getTextContent();
             }).then(textContent => {
-                procesarTextoPDF(textContent.items);
-                scheduleUI.style.display = 'block'; // Mostrar la tabla
-                document.getElementById('dropZone').style.display = 'none'; // Ocultar input
+                // AQUÍ OCURRE LA MAGIA DE EXTRAER LOS DATOS
+                const myClasses = procesarPDF(textContent.items);
+                renderClasses(myClasses);
+                
+                scheduleUI.style.display = 'block'; 
+                document.getElementById('dropZone').style.display = 'none'; 
             });
         };
         reader.readAsArrayBuffer(file);
     });
 
-    // Lógica principal: Buscar patrones de "Código-Sala" en el texto extraído
-    function procesarTextoPDF(items) {
-        // En el PDF de la USACH, las celdas de horario tienen el formato: "27014-0-T1- Sala: FIS621"
-        const cellPattern = /([0-9]{5}-[0-9])-[A-Z0-9-]+\s*Sala:\s*([A-Z0-9]+)/i;
-        
-        let extractedClasses = [];
+    // LECTOR DINÁMICO (NO NECESITA MEMORIZAR NADA, SOLO LEE Y USA MAYÚSCULAS)
+    function procesarPDF(items) {
+        let myClasses = [];
+        nombresRamos = {}; 
 
-        // Extraer todos los textos unidos para buscar patrones
-        // Nota: En una versión avanzada, usamos coordenadas X/Y (items[i].transform) 
-        // para ubicar exactamente el día y bloque. Aquí hacemos una simulación heurística basada en tu contexto.
-        
-        items.forEach(item => {
-            const text = item.str.trim();
-            const match = text.match(cellPattern);
-            if (match) {
-                const codigo = match[1]; // ej: 27014-0
-                const sala = match[2];   // ej: FIS621
-                const x = item.transform[4]; // Coordenada horizontal (Día aproximado)
-                const y = item.transform[5]; // Coordenada vertical (Bloque aproximado)
-                
-                extractedClasses.push({codigo, sala, x, y});
+        // Limpia el texto
+        let texts = items.map(i => i.str.replace(/\s+/g, ' ').trim()).filter(i => i.length > 0);
+        let textoCompleto = texts.join(" ");
+
+        // Extraer Salas
+        let rooms = {};
+        const roomRegex = /([0-9]{5}-[0-9])-([A-Z0-9\-]+?)[-\s]*Sala:\s*([A-Z0-9]+)/ig;
+        let m1;
+        while ((m1 = roomRegex.exec(textoCompleto)) !== null) {
+            let code = m1[1];
+            let coord = m1[2].replace(/-/g, ''); 
+            rooms[`${code}-${coord}`] = m1[3];
+        }
+
+        let currentCode = null;
+        let currentCoord = null;
+        const dayMap = { 'L': 0, 'M': 1, 'W': 2, 'J': 3, 'V': 4 }; // Lunes a Viernes
+
+        for (let i = 0; i < texts.length; i++) {
+            let txt = texts[i];
+
+            // Busca el código y el nombre del ramo (Guarda el nombre en MAYÚSCULAS)
+            let mixedMatch1 = txt.match(/^([0-9]{5}-[0-9])[\s]+(.+)$/);
+            let mixedMatch2 = txt.match(/^(.+)[\s]+([0-9]{5}-[0-9])$/);
+            
+            if (mixedMatch1) {
+                currentCode = mixedMatch1[1];
+                nombresRamos[currentCode] = mixedMatch1[2].toUpperCase();
+                continue;
+            } else if (mixedMatch2) {
+                currentCode = mixedMatch2[2];
+                nombresRamos[currentCode] = mixedMatch2[1].toUpperCase();
+                continue;
             }
-        });
 
-        // -------------------------------------------------------------
-        // COMO ESTO ES UNA PRUEBA, POBLAREMOS LA TABLA USANDO TUS DATOS 
-        // REALES DEL PDF PARA DEMOSTRAR EL DISEÑO ASTRO SOFT:
-        // -------------------------------------------------------------
-        
-        // Bloque 2 (09:50) Jueves
-        renderClass(3, 1, "27024-0", "FIN675");
-        // Bloque 3 (11:25) Jueves
-        renderClass(3, 2, "27024-0", "FIN675");
-        // Bloque 4 (13:45)
-        renderClass(0, 3, "27014-0", "FIS621"); // Lunes
-        renderClass(1, 3, "27025-0", "EPF765B"); // Martes
-        renderClass(2, 3, "27026-0", "FIS202"); // Miercoles
-        renderClass(3, 3, "27014-0", "FIS621"); // Jueves
-        // Bloque 5 (15:20)
-        renderClass(0, 4, "27016-0", "FIS624"); // Lunes
-        renderClass(1, 4, "27016-0", "FIS624"); // Martes
-        renderClass(2, 4, "27026-0", "FIS202"); // Miercoles
-        renderClass(4, 4, "27025-0", "EAO554"); // Viernes
-        // Bloque 6 (16:55)
-        renderClass(0, 5, "27017-0", "FIS622"); // Lunes
-        renderClass(1, 5, "27017-0", "FIS624"); // Martes
-        renderClass(2, 5, "27017-0", "FIS624"); // Miercoles
-        renderClass(4, 5, "27027-0", "EAO551"); // Viernes
+            let codeMatch = txt.match(/^([0-9]{5}-[0-9])$/);
+            if (codeMatch) {
+                currentCode = codeMatch[1];
+                let nextTxt = texts[i+1] || "";
+                let prevTxt = texts[i-1] || "";
+                
+                if (nextTxt && !nextTxt.match(/^[A-Z]-[0-9]+$/) && !nextTxt.match(/^[A-Z]$/) && !nextTxt.match(/^[0-9\.-]+$/)) {
+                    nombresRamos[currentCode] = nextTxt.toUpperCase();
+                } else if (prevTxt && !prevTxt.match(/^[0-9]+$/)) {
+                    nombresRamos[currentCode] = prevTxt.toUpperCase();
+                }
+                continue;
+            }
+
+            // Busca Coordenadas (ej: T-1)
+            let coordMatch = txt.match(/^([A-Z]-[0-9]+)$/);
+            if (coordMatch) {
+                currentCoord = coordMatch[1].replace(/-/g, '');
+                continue;
+            }
+
+            // Busca los días de la semana y bloques (ej: L4, M6W6)
+            let scheduleMatch = txt.match(/^([LMWJV][1-9])+$/);
+            if (scheduleMatch && currentCode) {
+                let horario = txt;
+                let room = rooms[`${currentCode}-${currentCoord}`] || "POR ASIGNAR";
+                
+                const horRegex = /([LMWJV])([1-9])/g;
+                let hMatch;
+                while ((hMatch = horRegex.exec(horario)) !== null) {
+                    let dayChar = hMatch[1];
+                    let blockNum = parseInt(hMatch[2]);
+                    
+                    // Solo agrega si el bloque existe en nuestra tabla (1 a 6)
+                    if (dayMap[dayChar] !== undefined && blockNum <= modulos.length) {
+                        myClasses.push({
+                            day: dayMap[dayChar],
+                            block: blockNum - 1, 
+                            code: currentCode,
+                            room: room
+                        });
+                    }
+                }
+            }
+        }
+        return myClasses;
     }
 
-    function renderClass(dayIndex, blockIndex, code, room) {
-        const cell = document.getElementById(`cell-${dayIndex}-${blockIndex}`);
-        const nombreRamo = nombresRamos[code] || "Astrofísica";
-        
-        if (cell) {
-            cell.innerHTML = `
-                <div class="class-card">
-                    <span class="class-code">${nombreRamo}</span>
-                    <span class="class-room">📍 ${room}</span>
-                </div>
-            `;
-        }
+    // Dibuja las tarjetas en la tabla
+    function renderClasses(classesArray) {
+        classesArray.forEach(cls => {
+            const cell = document.getElementById(`cell-${cls.day}-${cls.block}`);
+            const nombreRamo = nombresRamos[cls.code] || `CURSO ${cls.code}`; // Usa el nombre dinámico
+            
+            if (cell) {
+                // Se agrega += por si hay más de un ramo en el mismo bloque (apilables)
+                cell.innerHTML += `
+                    <div class="class-card">
+                        <span class="class-code">${nombreRamo}</span>
+                        <span class="class-room">📍 ${cls.room}</span>
+                    </div>
+                `;
+            }
+        });
     }
 </script>
 
