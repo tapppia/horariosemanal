@@ -7,7 +7,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
     <style>
         :root {
-            --primary: #FFD60A; /* Amarillo USACH */
+            --primary: #FFD60A; 
             --dark: #111;
             --gray: #f5f5f7;
             --text: #333;
@@ -73,7 +73,7 @@
 
         table { width: 100%; border-collapse: collapse; text-align: center; }
         
-        /* CAMBIO DE DISEÑO: Encabezado Amarillo con letras Negras */
+        /* ¡LÍNEAS NEGRAS ELIMINADAS AQUÍ! */
         th { 
             background: var(--primary); 
             color: var(--dark); 
@@ -83,7 +83,7 @@
             padding: 15px 10px; 
             font-weight: 500; 
             font-size: 1.05rem;
-            border: 1px solid var(--dark);
+            border: none; /* Adiós líneas verticales */
         }
         
         td { border: 1px solid var(--border); padding: 12px 5px; vertical-align: middle; width: 16.6%; height: 70px;}
@@ -156,7 +156,6 @@
 
     const modulos = ["08:15 - 09:35", "09:50 - 11:10", "11:25 - 12:45", "13:45 - 15:05", "15:20 - 16:40", "16:55 - 18:15"];
     
-    // Diccionario dinámico: Empezará vacío y se llenará leyendo el PDF
     let nombresRamos = {};
 
     window.onload = function() {
@@ -195,13 +194,9 @@
             .then(page => page.getTextContent())
             .then(textContent => {
                 
-                // 1. Extraer nombres reales de los ramos dinámicamente
                 extraerDiccionario(textContent.items);
-
-                // 2. Extraer las clases (Por ahora simulamos la ubicación matemática)
                 const myClasses = extraerCoordenadasSimuladas(textContent.items);
                 
-                // GUARDAR EN MEMORIA
                 localStorage.setItem('astroHorarioSaved', JSON.stringify(myClasses));
                 localStorage.setItem('astroRamosSaved', JSON.stringify(nombresRamos));
                 
@@ -213,20 +208,15 @@
         reader.readAsArrayBuffer(file);
     });
 
-    // LÓGICA DINÁMICA: Aprende los nombres de los ramos leyendo el PDF
     function extraerDiccionario(items) {
         nombresRamos = {};
-        // Unimos todo el texto para buscar patrones "27014-0 MECÁNICA NEWTONIANA"
         let textoCompleto = items.map(i => i.str).join(" ");
-        
-        // Expresión regular que busca "5 números - 1 número" seguido de letras mayúsculas
         const regexDiccionario = /([0-9]{5}-[0-9])\s+([A-ZÁÉÍÓÚÑ\s]+?)(?=\s+[A-Z]-\d|\s+[A-Z]\s|\s+\d-\d-\d|$)/g;
         
         let match;
         while ((match = regexDiccionario.exec(textoCompleto)) !== null) {
             let codigo = match[1];
             let nombre = match[2].trim().toLowerCase();
-            // Evitar basura en la lectura
             if(nombre.length > 3 && !nombre.includes("horario")) {
                 nombresRamos[codigo] = nombre;
             }
@@ -234,9 +224,6 @@
     }
 
     function extraerCoordenadasSimuladas(items) {
-        // En una versión 100% universal de pago, aquí se calcularía:
-        // Si X está entre 150 y 250 -> Lunes. Si Y está entre 400 y 450 -> Bloque 3.
-        // Para esta herramienta, usamos tu estructura para demostrar que renderiza el diccionario dinámico.
         return [
             { day: 3, block: 1, code: "27024-0", room: "FIN675" },
             { day: 3, block: 2, code: "27024-0", room: "FIN675" },
@@ -259,7 +246,6 @@
         initGrid(); 
         classesArray.forEach(cls => {
             const cell = document.getElementById(`cell-${cls.day}-${cls.block}`);
-            // Usar el nombre que aprendió dinámicamente del PDF
             const nombreRamo = nombresRamos[cls.code] || `Ramo ${cls.code}`;
             if (cell) {
                 cell.innerHTML = `
