@@ -155,7 +155,7 @@
 
     <label class="upload-zone" id="dropZone">
         <div class="upload-title">📄 Generador de Horario Universal</div>
-        <div class="upload-desc">Sube tu PDF de inscripción de asignaturas.<br><b>El sistema extraerá tus ramos completos y guardará tu horario automáticamente.</b></div>
+        <div class="upload-desc" id="statusText">Sube tu PDF de inscripción de asignaturas.<br><b>El sistema extraerá tus ramos completos y guardará tu horario automáticamente.</b></div>
         <button class="btn-upload" onclick="document.getElementById('pdfInput').click()">Seleccionar PDF</button>
         <input type="file" id="pdfInput" accept=".pdf">
     </label>
@@ -182,11 +182,12 @@
     const scheduleUI = document.getElementById('scheduleUI');
     const dropZone = document.getElementById('dropZone');
     const tbody = document.querySelector('#scheduleTable tbody');
+    const statusText = document.getElementById('statusText');
 
     const modulos = [
         "08:15 - 09:35", "09:50 - 11:10", "11:25 - 12:45", 
         "13:45 - 15:05", "15:20 - 16:40", "16:55 - 18:15", 
-        "18:30 - 19:50"
+        "18:30 - 19:50", "20:05 - 21:25", "21:25 - 22:45"
     ];
     
     let nombresRamos = {};
@@ -218,7 +219,9 @@
 
     fileInput.addEventListener('change', function(e) {
         const file = e.target.files[0];
-        if (!file || file.type !== 'application/pdf') return alert('Sube un PDF válido.');
+        if (!file || file.type !== 'application/pdf') return alert('Por favor, sube un archivo PDF válido.');
+
+        statusText.innerHTML = "<b>⏳ Procesando la matriz cuántica del PDF...</b>";
 
         const reader = new FileReader();
         reader.onload = function(evt) {
@@ -226,74 +229,117 @@
             pdfjsLib.getDocument(typedarray).promise.then(pdf => pdf.getPage(1))
             .then(page => page.getTextContent())
             .then(textContent => {
+                try {
+                    const myClasses = procesarPDFMagico(textContent.items);
+                    
+                    if (myClasses.length === 0) {
+                        throw new Error("No classes found");
+                    }
+
+                    localStorage.setItem('astroHorarioSaved', JSON.stringify(myClasses));
+                    localStorage.setItem('astroRamosSaved', JSON.stringify(nombresRamos));
+                    
+                    dropZone.style.display = 'none';
+                    scheduleUI.style.display = 'flex';
+                    renderSavedData(myClasses);
+                    statusText.innerHTML = "Sube tu PDF de inscripción de asignaturas.<br><b>El sistema extraerá tus ramos completos y guardará tu horario automáticamente.</b>";
                 
-                const myClasses = procesarPDFMagico(textContent.items);
-                
-                localStorage.setItem('astroHorarioSaved', JSON.stringify(myClasses));
-                localStorage.setItem('astroRamosSaved', JSON.stringify(nombresRamos));
-                
-                dropZone.style.display = 'none';
-                scheduleUI.style.display = 'flex';
-                renderSavedData(myClasses);
+                } catch (error) {
+                    console.error(error);
+                    alert("No pude detectar el horario en este PDF. ¿Estás seguro de que es el comprobante de inscripción de asignaturas?");
+                    statusText.innerHTML = "Sube tu PDF de inscripción de asignaturas.<br><b>El sistema extraerá tus ramos completos y guardará tu horario automáticamente.</b>";
+                    fileInput.value = "";
+                }
             });
         };
         reader.readAsArrayBuffer(file);
     });
 
-    // --- EL CEREBRO DE LA GRAMÁTICA (AHORA SÍ FUNCIONA PERFECTO) ---
+    // --- CEREBRO GRAMATICAL ---
     function formatoNombre(str) {
-        // Quitamos números basura que se puedan colar al inicio y limpiamos espacios
         str = str.replace(/^[0-9\s]+/, '').replace(/\s+/g, ' ').trim().toLowerCase();
         const words = str.split(' ');
-        
-        // Palabras que no llevan mayúscula
         const minorWords = ['a', 'ante', 'bajo', 'con', 'contra', 'de', 'desde', 'en', 'entre', 'hacia', 'hasta', 'para', 'por', 'según', 'sin', 'sobre', 'tras', 'el', 'la', 'los', 'las', 'un', 'una', 'unos', 'unas', 'y', 'e', 'o', 'u'];
-        // Números romanos
         const romanNumerals = ['i', 'ii', 'iii', 'iv', 'v', 'vi', 'vii', 'viii', 'ix', 'x'];
 
         return words.map((word, i) => {
             if (!word) return '';
-            // Si es número romano, TODO en mayúscula
             if (romanNumerals.includes(word)) return word.toUpperCase();
-            // Si es palabra conectora (y no es la primera palabra del título), se queda en minúscula
             if (minorWords.includes(word) && i !== 0) return word; 
-            // Si no es ninguna de las anteriores, primera letra mayúscula
             return word.charAt(0).toUpperCase() + word.slice(1);
         }).join(' ');
     }
 
+    // --- NUEVO LECTOR INTELIGENTE PALABRA POR PALABRA ---
     function procesarPDFMagico(items) {
-        // Unimos el texto y reparamos saltos de línea extraños
-        let textoCompleto = items.map(i => i.str).join(" ").replace(/\s+/g, ' ');
         let myClasses = [];
         nombresRamos = {}; 
 
-        // 1. EXTRAER SALAS
+        // Limpiar los textos extraídos
+        let texts = items.map(i => i.str.replace(/\s+/g, ' ').trim()).filter(i => i.length > 0);
+        let textoCompleto = texts.join(" ");
+
+        // 1. EXTRAER SALAS (Desde la tabla de abajo)
         let rooms = {};
-        const roomRegex = /([0-9]{5}-[0-9])-([A-Z0-9]+)[-\s]*Sala:\s*([A-Z0-9]+)/ig;
+        const roomRegex = /([0-9]{5}-[0-9])-([A-Z0-9\-]+?)[-\s]*Sala:\s*([A-Z0-9]+)/ig;
         let m1;
         while ((m1 = roomRegex.exec(textoCompleto)) !== null) {
-            rooms[`${m1[1]}-${m1[2]}`] = m1[3];
+            let code = m1[1];
+            let coord = m1[2].replace(/-/g, ''); // Limpia "T-1" a "T1"
+            rooms[`${code}-${coord}`] = m1[3];
         }
 
-        // 2. EXTRAER NOMBRES Y HORARIOS (AHORA AGARRA EL NOMBRE COMPLETO SIN CORTARSE)
-        const rowRegex = /(?:([0-9]{5}-[0-9])\s+([A-ZÁÉÍÓÚÑ ,\.-]+?)|([A-ZÁÉÍÓÚÑ ,\.-]+)\s+([0-9]{5}-[0-9]))\s+([A-Z]-[0-9])\s+[A-Z]\s+(?:\d-\d-\d|\d)\s+([LMWJVS0-9]+)/g;
+        // 2. EXTRAER RAMOS Y HORARIOS (Análisis por tokens)
+        let currentCode = null;
+        let currentCoord = null;
         const dayMap = { 'L': 0, 'M': 1, 'W': 2, 'J': 3, 'V': 4, 'S': 5 };
-        
-        let m2;
-        while ((m2 = rowRegex.exec(textoCompleto)) !== null) {
-            let code = m2[1] || m2[4];
-            let rawName = m2[2] || m2[3];
-            let coord = m2[5];     
-            let horario = m2[6];   
 
-            // Pasamos el nombre extraído por el cerebro gramatical
-            nombresRamos[code] = formatoNombre(rawName);
+        for (let i = 0; i < texts.length; i++) {
+            let txt = texts[i];
 
-            let cleanCoord = coord.replace('-', '');
-            let room = rooms[`${code}-${cleanCoord}`] || "Por asignar";
+            // A) Código y Nombre venían pegados (ej: "27014-0 MECÁNICA NEWTONIANA")
+            let mixedMatch1 = txt.match(/^([0-9]{5}-[0-9])[\s]+(.+)$/);
+            let mixedMatch2 = txt.match(/^(.+)[\s]+([0-9]{5}-[0-9])$/);
+            
+            if (mixedMatch1) {
+                currentCode = mixedMatch1[1];
+                nombresRamos[currentCode] = formatoNombre(mixedMatch1[2]);
+                continue;
+            } else if (mixedMatch2) {
+                currentCode = mixedMatch2[2];
+                nombresRamos[currentCode] = formatoNombre(mixedMatch2[1]);
+                continue;
+            }
 
-            if (horario) {
+            // B) Código suelto
+            let codeMatch = txt.match(/^([0-9]{5}-[0-9])$/);
+            if (codeMatch) {
+                currentCode = codeMatch[1];
+                let nextTxt = texts[i+1] || "";
+                let prevTxt = texts[i-1] || "";
+                
+                // Intenta deducir cuál es el nombre leyendo los textos adyacentes
+                if (nextTxt && !nextTxt.match(/^[A-Z]-[0-9]+$/) && !nextTxt.match(/^[A-Z]$/) && !nextTxt.match(/^[0-9\.-]+$/)) {
+                    nombresRamos[currentCode] = formatoNombre(nextTxt);
+                } else if (prevTxt && !prevTxt.match(/^[0-9]+$/)) {
+                    nombresRamos[currentCode] = formatoNombre(prevTxt);
+                }
+                continue;
+            }
+
+            // C) Coordenada (ej: "T-1")
+            let coordMatch = txt.match(/^([A-Z]-[0-9]+)$/);
+            if (coordMatch) {
+                currentCoord = coordMatch[1].replace(/-/g, '');
+                continue;
+            }
+
+            // D) Horario enconctrado (ej: "L4", "M6W6")
+            let scheduleMatch = txt.match(/^([LMWJVS][1-9])+$/);
+            if (scheduleMatch && currentCode) {
+                let horario = txt;
+                let room = rooms[`${currentCode}-${currentCoord}`] || "Por asignar";
+                
                 const horRegex = /([LMWJVS])([1-9])/g;
                 let hMatch;
                 while ((hMatch = horRegex.exec(horario)) !== null) {
@@ -302,8 +348,8 @@
                     
                     myClasses.push({
                         day: dayMap[dayChar],
-                        block: blockNum - 1,
-                        code: code,
+                        block: blockNum - 1, // Restamos 1 porque la tabla en JS empieza en 0
+                        code: currentCode,
                         room: room
                     });
                 }
@@ -316,7 +362,7 @@
         initGrid(); 
         classesArray.forEach(cls => {
             const cell = document.getElementById(`cell-${cls.day}-${cls.block}`);
-            const nombreRamo = nombresRamos[cls.code] || `Ramo ${cls.code}`;
+            const nombreRamo = nombresRamos[cls.code] || `Asignatura ${cls.code}`;
             if (cell) {
                 const cardHTML = `
                     <div class="class-card">
