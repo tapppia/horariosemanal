@@ -31,6 +31,7 @@
             margin-bottom: 25px;
             transition: border-color 0.2s;
             cursor: pointer;
+            box-sizing: border-box; /* Asegura que el padding no rompa el ancho en celular */
         }
 
         .upload-zone:hover {
@@ -66,10 +67,18 @@
             box-shadow: 0 4px 10px rgba(0,0,0,0.03); 
             overflow: hidden; 
             display: none; 
-            flex-direction: column; /* Agregado para alinear el botón */
+            flex-direction: column;
+            box-sizing: border-box; /* Protección extra para móviles */
         }
 
-        table { width: 100%; border-collapse: collapse; text-align: center; }
+        /* ESTE ES EL CONTENEDOR NUEVO PARA EL CELULAR */
+        .table-responsive {
+            width: 100%;
+            overflow-x: auto; /* Permite deslizar hacia los lados en pantallas pequeñas */
+        }
+
+        /* Se agregó min-width: 700px para que las columnas no se aplasten */
+        table { width: 100%; min-width: 700px; border-collapse: collapse; text-align: center; }
         
         th { 
             background: var(--primary); 
@@ -133,7 +142,6 @@
             border: 1px solid #e5e7eb;
         }
 
-        /* DISEÑO DEL NUEVO BOTÓN PARA CARGAR OTRO PDF */
         .btn-reset {
             background: transparent;
             color: #d32f2f;
@@ -143,7 +151,7 @@
             cursor: pointer;
             font-family: 'Inter', sans-serif;
             font-size: 0.85rem;
-            margin: 15px auto 20px auto; /* Centrado abajo de la tabla */
+            margin: 15px auto 20px auto; 
             transition: 0.2s;
             display: block;
         }
@@ -158,27 +166,29 @@
 <body>
 
     <label class="upload-zone" id="dropZone">
-        <div class="upload-title">Genera tu Horario!</div>
+        <div class="upload-title">Genera de Horario!</div>
         <div class="upload-desc">Haz clic o arrastra tu PDF obtenido en Intranet aquí para generar tu horario.</div>
         <button class="btn-upload" onclick="document.getElementById('pdfInput').click()">Seleccionar PDF</button>
         <input type="file" id="pdfInput" accept=".pdf">
     </label>
 
     <div class="schedule-container" id="scheduleUI">
-        <table id="scheduleTable">
-            <thead>
-                <tr>
-                    <th>Bloque</th>
-                    <th>Lunes</th>
-                    <th>Martes</th>
-                    <th>Miércoles</th>
-                    <th>Jueves</th>
-                    <th>Viernes</th>
-                </tr>
-            </thead>
-            <tbody>
-                </tbody>
-        </table>
+        <div class="table-responsive">
+            <table id="scheduleTable">
+                <thead>
+                    <tr>
+                        <th>Bloque</th>
+                        <th>Lunes</th>
+                        <th>Martes</th>
+                        <th>Miércoles</th>
+                        <th>Jueves</th>
+                        <th>Viernes</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    </tbody>
+            </table>
+        </div>
         <button class="btn-reset" onclick="recargarPDF()">Cargar otro PDF</button>
     </div>
 
@@ -231,7 +241,6 @@
                 const myClasses = procesarPDF(textContent.items);
                 renderClasses(myClasses);
                 
-                // Muestra la tabla (usamos flex para que el botón quede centrado)
                 scheduleUI.style.display = 'flex'; 
                 document.getElementById('dropZone').style.display = 'none'; 
             });
@@ -336,11 +345,10 @@
         });
     }
 
-    // FUNCIÓN PARA VOLVER A EMPEZAR
     function recargarPDF() {
         scheduleUI.style.display = 'none';
         document.getElementById('dropZone').style.display = 'block';
-        fileInput.value = ''; // Resetea el input para permitir subir el mismo archivo si se quiere
+        fileInput.value = ''; 
     }
 </script>
 
