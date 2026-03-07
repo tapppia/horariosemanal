@@ -15,18 +15,17 @@
 
         body {
             font-family: 'Inter', sans-serif;
-            background: #ffffff; /* Fondo blanco */
+            background: #ffffff; 
             margin: 0; padding: 20px;
             color: var(--dark);
             display: flex; flex-direction: column; align-items: center;
         }
 
-        /* ZONA DE CARGA: Curvas suaves por fuera */
         .upload-zone {
             background: #fff;
             width: 100%; max-width: 800px;
             border: 2px dashed #bbb;
-            border-radius: 12px; /* Redondeado amigable */
+            border-radius: 12px; 
             padding: 35px 20px;
             text-align: center;
             margin-bottom: 25px;
@@ -59,15 +58,15 @@
         
         .btn-upload:hover { background: #333; }
 
-        /* TABLA DEL HORARIO: Contenedor redondeado, pero tabla estructurada */
         .schedule-container {
             width: 100%; max-width: 850px; 
             background: #fff;
-            border-radius: 12px; /* Redondeado por fuera */
+            border-radius: 12px; 
             border: 1px solid var(--border);
-            box-shadow: 0 4px 10px rgba(0,0,0,0.03); /* Sombra súper sutil, no IA */
-            overflow: hidden; /* Corta las esquinas de la tabla para que respete el borde */
+            box-shadow: 0 4px 10px rgba(0,0,0,0.03); 
+            overflow: hidden; 
             display: none; 
+            flex-direction: column; /* Agregado para alinear el botón */
         }
 
         table { width: 100%; border-collapse: collapse; text-align: center; }
@@ -81,7 +80,7 @@
             padding: 10px 5px; 
             font-weight: 500; 
             font-size: 0.9rem;
-            border-bottom: 2px solid var(--dark); /* Da peso visual separando los días del contenido */
+            border-bottom: 2px solid var(--dark); 
         }
         
         td { 
@@ -102,13 +101,12 @@
             border-right: 1px solid var(--border);
         }
 
-        /* TARJETA DE ASIGNATURA: Práctica y semi-cuadrada */
         .class-card {
             background: #fff; 
             border: 1px solid #e5e7eb;
             border-left: 4px solid var(--primary);
             padding: 6px 8px;
-            border-radius: 4px; /* Apenas redondeada, para que no sea un bloque de lego */
+            border-radius: 4px; 
             display: flex;
             flex-direction: column;
             gap: 4px;
@@ -124,7 +122,6 @@
             line-height: 1.2;
         }
         
-        /* ETIQUETA DE SALA: Limpia y moderna (sin fuente de programador) */
         .class-room { 
             font-size: 0.7rem; 
             color: #555; 
@@ -136,13 +133,33 @@
             border: 1px solid #e5e7eb;
         }
 
+        /* DISEÑO DEL NUEVO BOTÓN PARA CARGAR OTRO PDF */
+        .btn-reset {
+            background: transparent;
+            color: #d32f2f;
+            border: 1px solid #d32f2f;
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-family: 'Inter', sans-serif;
+            font-size: 0.85rem;
+            margin: 15px auto 20px auto; /* Centrado abajo de la tabla */
+            transition: 0.2s;
+            display: block;
+        }
+
+        .btn-reset:hover { 
+            background: #d32f2f; 
+            color: #fff; 
+        }
+
     </style>
 </head>
 <body>
 
     <label class="upload-zone" id="dropZone">
-        <div class="upload-title"> Generador de Horario </div>
-        <div class="upload-desc">Haz clic o arrastra tu PDF aquí para generar tu horario! </div>
+        <div class="upload-title">Genera tu Horario!</div>
+        <div class="upload-desc">Haz clic o arrastra tu PDF obtenido en Intranet aquí para generar tu horario.</div>
         <button class="btn-upload" onclick="document.getElementById('pdfInput').click()">Seleccionar PDF</button>
         <input type="file" id="pdfInput" accept=".pdf">
     </label>
@@ -162,6 +179,7 @@
             <tbody>
                 </tbody>
         </table>
+        <button class="btn-reset" onclick="recargarPDF()">Cargar otro PDF</button>
     </div>
 
 <script>
@@ -213,7 +231,8 @@
                 const myClasses = procesarPDF(textContent.items);
                 renderClasses(myClasses);
                 
-                scheduleUI.style.display = 'block'; 
+                // Muestra la tabla (usamos flex para que el botón quede centrado)
+                scheduleUI.style.display = 'flex'; 
                 document.getElementById('dropZone').style.display = 'none'; 
             });
         };
@@ -315,6 +334,13 @@
                 `;
             }
         });
+    }
+
+    // FUNCIÓN PARA VOLVER A EMPEZAR
+    function recargarPDF() {
+        scheduleUI.style.display = 'none';
+        document.getElementById('dropZone').style.display = 'block';
+        fileInput.value = ''; // Resetea el input para permitir subir el mismo archivo si se quiere
     }
 </script>
 
